@@ -14,6 +14,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// DLQMessage represents a message that has exceeded its maximum delivery
+// attempts and has been moved to the dead letter queue.
+//
+// It contains the original message payload, headers, and metadata about
+// the delivery failure.
 type DLQMessage struct {
 	Advisory MaxDeliveriesAdvisory
 
@@ -30,8 +35,18 @@ type DLQMessage struct {
 	ReceivedAt time.Time
 }
 
+// DLQHandler is a function that processes messages from the dead letter queue.
+//
+// The handler receives the original message that failed to be processed
+// after all retry attempts. It should handle the failure gracefully, such as
+// logging, storing in a separate system, or alerting.
 type DLQHandler func(ctx context.Context, msg DLQMessage) error
 
+// MaxDeliveriesAdvisory is a JetStream advisory that is emitted when a message
+// exceeds its maximum delivery attempts.
+//
+// This advisory is used by the DLQ consumer to retrieve and process the
+// failed message.
 type MaxDeliveriesAdvisory struct {
 	Type      string `json:"type"`
 	ID        string `json:"id"`
@@ -44,6 +59,20 @@ type MaxDeliveriesAdvisory struct {
 	Deliveries uint64 `json:"deliveries"`
 }
 
+// StartDLQConsumer creates a dead letter queue consumer for the given stream.
+//
+// This method:
+//
+//  1. Creates a DLQ stream named {originalStream}_dlq
+//  2. Creates a consumer on the DLQ stream
+//  3. Starts consuming max delivery advisories
+//  4. Retrieves the original failed message and passes it to the handler
+//
+// The DLQ consumer is automatically stopped when Close() is called on the Manager.
+//
+// Parameters:
+//   - originalStream: The name of the original JetStream stream to monitor
+//   - handler: The function to call for each failed message
 func (m *Manager) StartDLQConsumer(
 	originalStream string,
 	handler DLQHandler,

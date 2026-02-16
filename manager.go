@@ -78,7 +78,26 @@ func WithConsumerPrefetch(count int) Option {
 	}
 }
 
-// NewEventManager and returns the Manager.
+// New creates and returns a new Manager.
+//
+// This is a convenience alias for NewEventManager.
+// Multiple calls return the same instance.
+// This function is safe for concurrent use.
+//
+// The caller MUST call Close() during application shutdown.
+//
+// Example:
+//
+//	mgr, err := natsx.New()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer mgr.Close()
+func New(opts ...Option) (*Manager, error) {
+	return NewEventManager(opts...)
+}
+
+// NewEventManager creates and returns a new Manager.
 //
 // Multiple calls return the same instance.
 // This function is safe for concurrent use.
