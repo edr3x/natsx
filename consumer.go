@@ -14,6 +14,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// ConsumerSpec defines the configuration for a JetStream consumer.
+//
+// The Name and Subject fields are required. All other fields have sensible defaults.
 type ConsumerSpec struct {
 	Name       string
 	Subject    string

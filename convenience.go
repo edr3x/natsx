@@ -14,7 +14,12 @@ var (
 )
 
 // DefaultManager returns the default Manager instance.
-// The manager is created lazily on first call.
+//
+// The manager is created lazily on first call using default options.
+// Subsequent calls return the same instance.
+//
+// This is a convenience function for applications that only need
+// a single NATS connection. For more control, use NewEventManager directly.
 func DefaultManager() (*Manager, error) {
 	defaultMutex.Lock()
 	defer defaultMutex.Unlock()
@@ -28,7 +33,12 @@ func DefaultManager() (*Manager, error) {
 }
 
 // SetDefaultManager sets the default manager instance.
-// This is useful for testing or custom configuration.
+//
+// This is useful for testing or when you need to use a custom-configured
+// manager with the convenience functions like Publish and Subscribe.
+//
+// Note: This function is not safe for concurrent use with DefaultManager()
+// in other goroutines.
 func SetDefaultManager(m *Manager) {
 	defaultManager = m
 }
@@ -36,8 +46,15 @@ func SetDefaultManager(m *Manager) {
 // SimpleHandler is a simplified handler that takes raw data instead of jetstream.Msg.
 type SimpleHandler func(ctx context.Context, data []byte) error
 
-// Subscribe is a convenience function that subscribes to a NATS stream.
-// This is a simplified version for backward compatibility.
+// Subscribe is a convenience function that subscribes to a NATS stream
+// using the default manager.
+//
+// It retrieves the stream and consumer from JetStream and registers
+// a handler to process messages. The handler receives the raw message
+// data as []byte rather than a jetstream.Msg.
+//
+// This is a simplified version for common use cases. For more control,
+// use Manager.Subscribe directly.
 func Subscribe(ctx context.Context, stream, consumer string, handler SimpleHandler) error {
 	mgr, err := DefaultManager()
 	if err != nil {
@@ -61,7 +78,11 @@ func Subscribe(ctx context.Context, stream, consumer string, handler SimpleHandl
 	})
 }
 
-// Publish is a convenience function that uses the default manager.
+// Publish is a convenience function that publishes a message
+// using the default manager.
+//
+// This is a simplified version for common use cases. For more control,
+// use Manager.Publish directly.
 func Publish(ctx context.Context, subject string, data []byte) error {
 	mgr, err := DefaultManager()
 	if err != nil {
