@@ -90,3 +90,12 @@ func Publish(ctx context.Context, subject string, data []byte) error {
 	}
 	return mgr.Publish(ctx, subject, data)
 }
+
+// PublishWithHeaders is a convenience function that uses the default manager.
+func PublishWithHeaders(ctx context.Context, subject string, data []byte, extraHeaders map[string][]string) error {
+	mgr, err := DefaultManager()
+	if err != nil {
+		return err
+	}
+	return mgr.PublishWithHeaders(ctx, subject, data, extraHeaders)
+}
