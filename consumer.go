@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -98,7 +100,13 @@ func (c *ConsumerSpec) RegisterConsumer(
 	}
 
 	// Create or update the JetStream consumer
-	return stream.CreateOrUpdateConsumer(ctx, consumerConfig)
+	consumer, err := stream.CreateOrUpdateConsumer(ctx, consumerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("registered nats consumer", "name", c.Name, "subject", c.Subject)
+	return consumer, nil
 }
 
 // Subscribe starts a JetStream consumer and registers it for shutdown.
@@ -111,15 +119,9 @@ func (c *ConsumerSpec) RegisterConsumer(
 // This method is safe to call multiple times.
 func (m *Manager) Subscribe(consumer jetstream.Consumer, handler Handler) error {
 	fn := func(msg jetstream.Msg) {
-		// extract traceparent from header and set it
-		carrier := propagation.MapCarrier{}
-		if h := msg.Headers(); h != nil {
-			carrier["traceparent"] = h.Get("traceparent")
-		}
-
 		ctx := otel.GetTextMapPropagator().Extract(
 			context.Background(), // we do not pass the context from consumer as this needs to run on background always
-			carrier,
+			headerCarrier(msg.Headers()),
 		)
 
 		ctx, span := otel.Tracer("nats.consumer").Start(
@@ -188,3 +190,19 @@ func (m *Manager) Subscribe(consumer jetstream.Consumer, handler Handler) error 
 
 	return nil
 }
+
+// headerCarrier reads trace headers from nats.Header in either case: Publish
+// writes canonical "Traceparent", while the nats CLI and non-Go clients send
+// raw "traceparent", and nats.Header.Get is case-sensitive.
+type headerCarrier nats.Header
+
+func (c headerCarrier) Get(key string) string {
+	if v := http.Header(c).Get(key); v != "" {
+		return v
+	}
+	return nats.Header(c).Get(key)
+}
+
+func (c headerCarrier) Set(key, value string) { http.Header(c).Set(key, value) }
+
+func (c headerCarrier) Keys() []string { return propagation.HeaderCarrier(c).Keys() }

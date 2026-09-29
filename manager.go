@@ -165,6 +165,10 @@ func subjectName(sub *nats.Subscription) string {
 //
 // This should be called exactly once during application shutdown.
 func (m *Manager) Close() {
+	if m == nil {
+		return
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
